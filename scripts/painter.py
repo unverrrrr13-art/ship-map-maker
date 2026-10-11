@@ -17,7 +17,7 @@ class ZonePainter:
         self._inverse = None
         self._zone_index = None
         self._zone_cache = {}        # zone_id -> (x0, y0, x1, y1, mask_crop)
-        self._orig_crop_cache = {}   # zone_id -> np.ndarray (H'×W'×4, оригинал)
+        self._orig_crop_cache = {}   # zone_id -> np.ndarray (H'×W'×4)
 
         self.painted = {}
         self.load_state()
@@ -42,7 +42,7 @@ class ZonePainter:
             self._zone_index[(r, g, b)] = i
 
     def _get_zone_data(self, zone_id):
-        """Возвращает (x0, y0, x1, y1, mask_crop) или None."""
+        """(x0, y0, x1, y1, mask_crop) или None."""
         if zone_id in self._zone_cache:
             return self._zone_cache[zone_id]
 
@@ -65,7 +65,7 @@ class ZonePainter:
         return data
 
     def _get_orig_crop(self, zone_id, x0, y0, x1, y1):
-        """Оригинал вырезанного прямоугольника (RGBA)."""
+        """Оригинальный кусок под bounding box (RGBA)."""
         if zone_id in self._orig_crop_cache:
             return self._orig_crop_cache[zone_id]
 
@@ -97,9 +97,14 @@ class ZonePainter:
         x0, y0, x1, y1, mask_crop = data
         orig_crop = self._get_orig_crop(zone_id, x0, y0, x1, y1)
 
-        # Возвращаем кусок оригинала обратно
-        restored = orig_crop.copy()
-        self.display_img.paste(Image.fromarray(restored, "RGBA"), (x0, y0))
+        # Берём текущее содержимое прямоугольника
+        disp_crop = np.array(self.display_img.crop((x0, y0, x1, y1)), dtype=np.uint8)
+
+        # Возвращаем оригинал ТОЛЬКО там, где маска этой зоны
+        m = mask_crop[..., None]   # H'×W'×1 — broadcasting
+        disp_crop = np.where(m, orig_crop, disp_crop)
+
+        self.display_img.paste(Image.fromarray(disp_crop, "RGBA"), (x0, y0))
 
         del self.painted[zone_id]
         return True
@@ -115,15 +120,15 @@ class ZonePainter:
 
         blended = (orig_rgb * (1.0 - alpha) + color_rgb * alpha).astype(np.uint8)
 
-        # Применяем только к пикселям маски
-        m = mask_crop[..., None]  # H'×W'×1 для broadcasting
+        # Применяем ТОЛЬКО к пикселям маски
+        m = mask_crop[..., None]
         disp_crop[..., :3] = np.where(m, blended, disp_crop[..., :3])
         disp_crop[..., 3] = np.where(mask_crop, 255, disp_crop[..., 3])
 
         self.display_img.paste(Image.fromarray(disp_crop, "RGBA"), (x0, y0))
 
     def _rebuild(self):
-        """Используется только при загрузке состояния — собирает всё разом."""
+        """Собирает display_img из оригинала + всех заливок. Только при загрузке."""
         self.display_img = self.orig_img.copy()
         for zone_id, color in self.painted.items():
             data = self._get_zone_data(zone_id)
