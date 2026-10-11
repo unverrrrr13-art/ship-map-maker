@@ -1,0 +1,5 @@
+Pravda:ff0000
+St.Gloriana:00aaff
+Kuromorimine:000000
+Saunders:00ff00
+Anzio:ffcc00
