@@ -1,10 +1,11 @@
 import tkinter as tk
-from tkinter import colorchooser
+from tkinter import colorchooser, filedialog, messagebox
 
 import config
 from image_loader import load_images
 from painter import ZonePainter
 from canvas_view import CanvasView
+from paths import project_root
 
 
 class InteractiveMapApp:
@@ -21,10 +22,16 @@ class InteractiveMapApp:
         self.painter = ZonePainter(images.orig, images.mask_array)
         self.current_paint_color = config.DEFAULT_PAINT_COLOR
 
-        # debounce на <Configure>
         self._resize_job = None
 
         self.setup_ui()
+
+        # Первый рендер (уже с восстановленным состоянием)
+        self.root.after(100, self._initial_render)
+
+    def _initial_render(self):
+        self.view.invalidate_cache()
+        self.view.render(self.painter.display_img, force=True)
 
     # === ИНТЕРФЕЙС ===
 
@@ -40,8 +47,7 @@ class InteractiveMapApp:
         panel.pack(side=tk.TOP, fill=tk.X)
 
         tk.Button(
-            panel,
-            text="Выбрать цвет школы",
+            panel, text="Выбрать цвет школы",
             command=self.choose_color,
             font=("Arial", 10, "bold"),
         ).pack(side=tk.LEFT, padx=10, pady=5)
@@ -59,6 +65,18 @@ class InteractiveMapApp:
             font=("Arial", 10),
         ).pack(side=tk.LEFT, padx=20)
 
+        tk.Button(
+            panel, text="Сохранить PNG",
+            command=self.save_png,
+            font=("Arial", 10),
+        ).pack(side=tk.LEFT, padx=10)
+
+        tk.Button(
+            panel, text="Сбросить всё",
+            command=self.reset_all,
+            font=("Arial", 10),
+        ).pack(side=tk.LEFT)
+
     # === ОБРАБОТЧИКИ ===
 
     def on_canvas_resize(self, event):
@@ -75,7 +93,6 @@ class InteractiveMapApp:
         x, y = self.view.to_image_coords(event.x, event.y)
         if x is None:
             return
-
         if not (0 <= x < self.orig_img.width and 0 <= y < self.orig_img.height):
             return
 
@@ -84,6 +101,9 @@ class InteractiveMapApp:
             return
 
         self.painter.paint_zone(zone_id, self.current_paint_color)
+        # Автосохранение после каждой покраски — чтобы ничего не потерялось
+        self.painter.save_state()
+
         self.view.invalidate_cache()
         self.view.render(self.painter.display_img, force=True)
 
@@ -93,3 +113,36 @@ class InteractiveMapApp:
             r, g, b = map(int, color_code[0])
             self.current_paint_color = (r, g, b, config.ACTIVE_ALPHA)
             self.color_indicator.config(bg=color_code[1])
+
+    # === СОХРАНЕНИЕ PNG ===
+
+    def save_png(self):
+        default_dir = project_root()
+        filepath = filedialog.asksaveasfilename(
+            title="Сохранить карту как PNG",
+            initialdir=str(default_dir),
+            defaultextension=".png",
+            filetypes=[("PNG", "*.png"), ("Все файлы", "*.*")],
+            initialfile="map_result.png",
+        )
+        if not filepath:
+            return
+
+        try:
+            # display_img уже в оригинальном разрешении
+            self.painter.display_img.save(filepath, "PNG")
+            messagebox.showinfo("Готово", f"Карта сохранена:\n{filepath}")
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось сохранить:\n{e}")
+
+    # === СБРОС ===
+
+    def reset_all(self):
+        if not messagebox.askyesno(
+            "Сброс",
+            "Убрать все заливки? Это действие нельзя отменить.",
+        ):
+            return
+        self.painter.reset()
+        self.view.invalidate_cache()
+        self.view.render(self.painter.display_img, force=True)
