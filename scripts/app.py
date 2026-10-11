@@ -14,18 +14,19 @@ class InteractiveMapApp:
         self.root.geometry(f"{config.WINDOW_WIDTH}x{config.WINDOW_HEIGHT}")
         self.root.minsize(config.WINDOW_MIN_WIDTH, config.WINDOW_MIN_HEIGHT)
 
-        # Загрузка
         images = load_images()
         self.orig_img = images.orig
         self.mask_img = images.mask
 
-        # Логика заливки
         self.painter = ZonePainter(images.orig, images.mask_array)
-
-        # Текущий цвет фракции
         self.current_paint_color = config.DEFAULT_PAINT_COLOR
 
+        # debounce на <Configure>
+        self._resize_job = None
+
         self.setup_ui()
+
+    # === ИНТЕРФЕЙС ===
 
     def setup_ui(self):
         self._build_control_panel()
@@ -38,25 +39,37 @@ class InteractiveMapApp:
         panel = tk.Frame(self.root, bg=config.PANEL_BG)
         panel.pack(side=tk.TOP, fill=tk.X)
 
-        tk.Button(panel, text="Выбрать цвет школы",
-                  command=self.choose_color,
-                  font=("Arial", 10, "bold")) \
-            .pack(side=tk.LEFT, padx=10, pady=5)
+        tk.Button(
+            panel,
+            text="Выбрать цвет школы",
+            command=self.choose_color,
+            font=("Arial", 10, "bold"),
+        ).pack(side=tk.LEFT, padx=10, pady=5)
 
-        self.color_indicator = tk.Frame(panel, width=30, height=20,
-                                        bg="#ff0000", relief=tk.SOLID, bd=1)
+        self.color_indicator = tk.Frame(
+            panel, width=30, height=20,
+            bg="#ff0000", relief=tk.SOLID, bd=1,
+        )
         self.color_indicator.pack(side=tk.LEFT)
 
-        tk.Label(panel,
-                 text="<- Кликните на каюту или квартал для захвата территории",
-                 bg=config.PANEL_BG, fg=config.TEXT_COLOR,
-                 font=("Arial", 10)) \
-            .pack(side=tk.LEFT, padx=20)
+        tk.Label(
+            panel,
+            text="<- Кликните на каюту или квартал для захвата территории",
+            bg=config.PANEL_BG, fg=config.TEXT_COLOR,
+            font=("Arial", 10),
+        ).pack(side=tk.LEFT, padx=20)
 
     # === ОБРАБОТЧИКИ ===
 
     def on_canvas_resize(self, event):
-        self.view.render(self.painter.display_img)
+        if self._resize_job is not None:
+            self.root.after_cancel(self._resize_job)
+        self._resize_job = self.root.after(80, self._do_resize_render)
+
+    def _do_resize_render(self):
+        self._resize_job = None
+        self.view.invalidate_cache()
+        self.view.render(self.painter.display_img, force=True)
 
     def on_canvas_click(self, event):
         x, y = self.view.to_image_coords(event.x, event.y)
@@ -71,7 +84,8 @@ class InteractiveMapApp:
             return
 
         self.painter.paint_zone(zone_id, self.current_paint_color)
-        self.view.render(self.painter.display_img)
+        self.view.invalidate_cache()
+        self.view.render(self.painter.display_img, force=True)
 
     def choose_color(self):
         color_code = colorchooser.askcolor(title="Выберите цвет фракции")
