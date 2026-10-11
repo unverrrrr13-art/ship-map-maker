@@ -20,3 +20,8 @@ def output_dir() -> Path:
     d = project_root() / "output"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+def storage_dir() -> Path:
+    d = project_root() / "storage"
+    d.mkdir(parents=True, exist_ok=True)
+    return d

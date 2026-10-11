@@ -3,11 +3,11 @@ from pathlib import Path
 from PIL import Image
 import numpy as np
 
-from paths import project_root
+from paths import storage_dir
 
 
 class ZonePainter:
-    STATE_FILE = "state.json"   # лежит в корне проекта
+    STATE_FILE = "state.json"
 
     def __init__(self, orig_img: Image.Image, mask_array: np.ndarray):
         self.orig_img = orig_img
@@ -51,6 +51,17 @@ class ZonePainter:
         self._rebuild()
         return self.display_img
 
+    def erase_zone(self, zone_id: tuple) -> bool:
+        """
+        Снимает заливку с зоны zone_id.
+        Возвращает True, если зона была покрашена и её удалили.
+        """
+        if zone_id not in self.painted:
+            return False
+        del self.painted[zone_id]
+        self._rebuild()
+        return True
+
     def _rebuild(self):
         """
         Строит display_img из оригинала + всех текущих заливок.
@@ -84,7 +95,7 @@ class ZonePainter:
 
     @property
     def _state_path(self) -> Path:
-        return project_root() / self.STATE_FILE
+        return storage_dir() / "state.json"
 
     def save_state(self):
         """
@@ -107,7 +118,7 @@ class ZonePainter:
             with open(self._state_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except (json.JSONDecodeError, OSError) as e:
-            print(f"Не удалось загрузить state.json: {e}")
+            print(f"Не удалось загрузить {self._state_path}: {e}")
             return
 
         painted = data.get("painted", {})
@@ -121,14 +132,3 @@ class ZonePainter:
 
         if self.painted:
             self._rebuild()
-    
-    def erase_zone(self, zone_id: tuple) -> bool:
-        """
-        Снимает заливку с зоны zone_id.
-        Возвращает True, если зона была покрашена и её удалили.
-        """
-        if zone_id not in self.painted:
-            return False
-        del self.painted[zone_id]
-        self._rebuild()
-        return True
