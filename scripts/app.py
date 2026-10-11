@@ -41,6 +41,7 @@ class InteractiveMapApp:
         self.view = CanvasView(self.root)
         self.view.bind("<Configure>", self.on_canvas_resize)
         self.view.bind("<Button-1>", self.on_canvas_click)
+        self.view.bind("<Button-3>", self.on_canvas_right_click)
 
     def _build_control_panel(self):
         panel = tk.Frame(self.root, bg=config.PANEL_BG)
@@ -99,6 +100,7 @@ class InteractiveMapApp:
         zone_id = self.mask_img.getpixel((x, y))
         if zone_id == (0, 0, 0):
             return
+            
 
         self.painter.paint_zone(zone_id, self.current_paint_color)
         # Автосохранение после каждой покраски — чтобы ничего не потерялось
@@ -106,6 +108,23 @@ class InteractiveMapApp:
 
         self.view.invalidate_cache()
         self.view.render(self.painter.display_img, force=True)
+
+    def on_canvas_right_click(self, event):
+        """ПКМ — снять заливку с зоны."""
+        x, y = self.view.to_image_coords(event.x, event.y)
+        if x is None:
+            return
+        if not (0 <= x < self.orig_img.width and 0 <= y < self.orig_img.height):
+            return
+
+        zone_id = self.mask_img.getpixel((x, y))
+        if zone_id == (0, 0, 0):
+            return
+
+        if self.painter.erase_zone(zone_id):
+            self.painter.save_state()
+            self.view.invalidate_cache()
+            self.view.render(self.painter.display_img, force=True)
 
     def choose_color(self):
         color_code = colorchooser.askcolor(title="Выберите цвет фракции")
