@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox
 from datetime import datetime
 
 import config
@@ -8,6 +8,7 @@ from painter import ZonePainter
 from canvas_view import CanvasView
 from paths import output_dir
 from schools import load_schools
+from ui_theme import apply_theme
 
 
 class InteractiveMapApp:
@@ -16,6 +17,10 @@ class InteractiveMapApp:
         self.root.title(config.WINDOW_TITLE)
         self.root.geometry(f"{config.WINDOW_WIDTH}x{config.WINDOW_HEIGHT}")
         self.root.minsize(config.WINDOW_MIN_WIDTH, config.WINDOW_MIN_HEIGHT)
+        self.root.configure(bg=config.COLOR_BG_DARK)
+
+        # Применяем ttk-тему до создания виджетов
+        apply_theme(self.root)
 
         # Загрузка изображений и маски
         images = load_images()
@@ -27,15 +32,13 @@ class InteractiveMapApp:
         self.current_paint_color = config.DEFAULT_PAINT_COLOR
 
         # Список школ из storage/schools.txt
-        self.schools = load_schools()   # [(name, (r,g,b)), ...]
+        self.schools = load_schools()
 
         # Внутреннее состояние UI
         self._resize_job = None
-        self._schools_menu = None       # ссылка на открытое меню (Frame)
+        self._schools_menu = None
 
         self.setup_ui()
-
-        # Первый рендер — после того, как окно получит реальные размеры
         self.root.after(100, self._initial_render)
 
     def _initial_render(self):
@@ -55,37 +58,42 @@ class InteractiveMapApp:
         self._build_schools_button()
 
     def _build_control_panel(self):
-        panel = tk.Frame(self.root, bg=config.PANEL_BG)
+        panel = tk.Frame(self.root, bg=config.COLOR_BG_PANEL)
         panel.pack(side=tk.TOP, fill=tk.X)
 
-        tk.Label(
+        # Тонкая линия под панелью
+        sep = tk.Frame(self.root, height=1, bg=config.COLOR_BORDER)
+        sep.pack(side=tk.TOP, fill=tk.X)
+
+        ttk.Label(
             panel,
-            text="<- Кликните на каюту или квартал для захвата территории",
-            bg=config.PANEL_BG, fg=config.TEXT_COLOR,
-            font=("Arial", 10),
-        ).pack(side=tk.LEFT, padx=20)
+            text="Кликните на каюту или квартал для захвата территории",
+            style="App.TLabel",
+        ).pack(side=tk.LEFT, padx=20, pady=10)
 
-        tk.Button(
-            panel, text="Сохранить PNG",
+        ttk.Button(
+            panel,
+            text="Сохранить PNG",
+            style="App.TButton",
             command=self.save_png,
-            font=("Arial", 10),
-        ).pack(side=tk.LEFT, padx=10)
+        ).pack(side=tk.RIGHT, padx=(0, 15), pady=8)
 
-        tk.Button(
-            panel, text="Сбросить всё",
+        ttk.Button(
+            panel,
+            text="Сбросить всё",
+            style="Secondary.TButton",
             command=self.reset_all,
-            font=("Arial", 10),
-        ).pack(side=tk.LEFT)
+        ).pack(side=tk.RIGHT, padx=(0, 8), pady=8)
 
     def _build_schools_button(self):
         """Кнопка внизу справа, поверх канваса."""
-        self.schools_btn = tk.Button(
+        self.schools_btn = ttk.Button(
             self.root,
             text="Выбрать школу",
-            font=("Arial", 10, "bold"),
+            style="App.TButton",
             command=self.toggle_schools_menu,
         )
-        self.schools_btn.place(relx=1.0, rely=1.0, anchor="se", x=-15, y=-15)
+        self.schools_btn.place(relx=1.0, rely=1.0, anchor="se", x=-20, y=-20)
 
     # === МЕНЮ ШКОЛ ===
 
@@ -96,29 +104,75 @@ class InteractiveMapApp:
             self._open_schools_menu()
 
     def _open_schools_menu(self):
-        # Меню — Frame внутри root, чтобы координаты считались в его системе
-        menu = tk.Frame(self.root, bg="#222222", bd=1, relief=tk.SOLID)
+        menu = tk.Frame(
+            self.root,
+            bg=config.COLOR_BG_MENU,
+            highlightthickness=1,
+            highlightbackground=config.COLOR_BORDER,
+        )
 
-        for name, rgb in self.schools:
-            row = tk.Frame(menu, bg="#222222")
-            row.pack(fill=tk.X, padx=6, pady=2)
+        # Заголовок меню
+        header = tk.Label(
+            menu,
+            text="Выбор школы",
+            bg=config.COLOR_BG_MENU,
+            fg=config.COLOR_TEXT_MUTED,
+            font=("Segoe UI", 9, "bold"),
+            anchor="w",
+            padx=10,
+            pady=6,
+        )
+        header.pack(fill=tk.X)
 
+        # Разделитель под заголовком
+        tk.Frame(menu, height=1, bg=config.COLOR_BORDER).pack(fill=tk.X)
+
+        for school_name, rgb in self.schools:
             hex_color = "#{:02x}{:02x}{:02x}".format(*rgb)
 
-            swatch = tk.Frame(row, width=16, height=16, bg=hex_color,
-                              relief=tk.SOLID, bd=1)
-            swatch.pack(side=tk.LEFT, padx=(0, 8))
+            row = tk.Frame(menu, bg=config.COLOR_BG_MENU, cursor="hand2")
+            row.pack(fill=tk.X)
+
+            inner = tk.Frame(row, bg=config.COLOR_BG_MENU)
+            inner.pack(fill=tk.X, padx=10, pady=6)
+
+            swatch = tk.Frame(
+                inner, width=14, height=14, bg=hex_color,
+                highlightthickness=1,
+                highlightbackground="#000000",
+            )
+            swatch.pack(side=tk.LEFT, padx=(0, 10))
             swatch.pack_propagate(False)
 
-            lbl = tk.Label(row, text=name, bg="#222222", fg="white",
-                           font=("Arial", 10), anchor="w")
+            lbl = tk.Label(
+                inner,
+                text=school_name,
+                bg=config.COLOR_BG_MENU,
+                fg=config.COLOR_TEXT_PRIMARY,
+                font=config.FONT_UI,
+                anchor="w",
+            )
             lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-            for w in (row, swatch, lbl):
-                w.bind("<Button-1>",
-                       lambda e, r=rgb, n=name: self._select_school(r, n))
+            # Замыкаем значения через аргументы по умолчанию,
+            # чтобы каждая итерация захватила свои row/inner/lbl.
+            def on_enter(e, row_w=row, inner_w=inner, lbl_w=lbl):
+                for w in (row_w, inner_w, lbl_w):
+                    w.configure(bg=config.COLOR_BG_MENU_HOVER)
 
-        # Считаем реальные размеры меню
+            def on_leave(e, row_w=row, inner_w=inner, lbl_w=lbl):
+                for w in (row_w, inner_w, lbl_w):
+                    w.configure(bg=config.COLOR_BG_MENU)
+
+            def on_click(e, rgb_=rgb, name_=school_name):
+                self._select_school(rgb_, name_)
+
+            for w in (row, inner, swatch, lbl):
+                w.bind("<Enter>", on_enter)
+                w.bind("<Leave>", on_leave)
+                w.bind("<Button-1>", on_click)
+
+        # Считаем размеры меню
         menu.update_idletasks()
         menu_w = menu.winfo_reqwidth()
         menu_h = menu.winfo_reqheight()
@@ -131,9 +185,8 @@ class InteractiveMapApp:
 
         # Меню над кнопкой, правые края выровнены
         x = btn_x + btn_w - menu_w
-        y = btn_y - menu_h - 6
+        y = btn_y - menu_h - 8
 
-        # Не вылезаем за окно
         root_w = self.root.winfo_width()
         root_h = self.root.winfo_height()
         if x < 0:
@@ -141,27 +194,22 @@ class InteractiveMapApp:
         if x + menu_w > root_w:
             x = root_w - menu_w
         if y < 0:
-            y = btn_y + btn_h + 6
+            y = btn_y + btn_h + 8
 
-        menu.place(x=x, y=y, width=menu_w, height=menu_h)
+        menu.place(x=x, y=y)
         menu.lift()
 
         self._schools_menu = menu
-
-        # Клик мимо меню — закрыть (add='+' — не перебиваем другие привязки)
         self.root.bind("<Button-1>", self._on_root_click, add="+")
 
     def _on_root_click(self, event):
         if self._schools_menu is None:
             return
-
-        # Проверяем, принадлежит ли клик меню или кнопке
         w = event.widget
         while w is not None:
             if w is self._schools_menu or w is self.schools_btn:
                 return
             w = getattr(w, "master", None)
-
         self._close_schools_menu()
 
     def _close_schools_menu(self):
