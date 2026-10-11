@@ -121,3 +121,14 @@ class ZonePainter:
 
         if self.painted:
             self._rebuild()
+    
+    def erase_zone(self, zone_id: tuple) -> bool:
+        """
+        Снимает заливку с зоны zone_id.
+        Возвращает True, если зона была покрашена и её удалили.
+        """
+        if zone_id not in self.painted:
+            return False
+        del self.painted[zone_id]
+        self._rebuild()
+        return True
