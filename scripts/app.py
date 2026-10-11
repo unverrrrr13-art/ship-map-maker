@@ -5,7 +5,8 @@ import config
 from image_loader import load_images
 from painter import ZonePainter
 from canvas_view import CanvasView
-from paths import project_root
+from paths import project_root, output_dir
+from datetime import datetime
 
 
 class InteractiveMapApp:
@@ -136,19 +137,21 @@ class InteractiveMapApp:
     # === СОХРАНЕНИЕ PNG ===
 
     def save_png(self):
-        default_dir = project_root()
+        # Имя по умолчанию: map_2026-10-11_14-35-07.png
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        default_name = f"map_{timestamp}.png"
+
         filepath = filedialog.asksaveasfilename(
             title="Сохранить карту как PNG",
-            initialdir=str(default_dir),
+            initialdir=str(output_dir()),
             defaultextension=".png",
             filetypes=[("PNG", "*.png"), ("Все файлы", "*.*")],
-            initialfile="map_result.png",
+            initialfile=default_name,
         )
         if not filepath:
             return
 
         try:
-            # display_img уже в оригинальном разрешении
             self.painter.display_img.save(filepath, "PNG")
             messagebox.showinfo("Готово", f"Карта сохранена:\n{filepath}")
         except Exception as e:

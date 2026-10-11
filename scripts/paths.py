@@ -13,3 +13,10 @@ def images_dir() -> Path:
 def image_path(filename: str) -> str:
     """Полный путь к файлу в images/ в виде строки."""
     return str(images_dir() / filename)
+
+
+def output_dir() -> Path:
+    """Папка для сохранённых карт. Создаётся автоматически при первом обращении."""
+    d = project_root() / "output"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
