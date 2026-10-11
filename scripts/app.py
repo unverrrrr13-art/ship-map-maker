@@ -37,6 +37,9 @@ class InteractiveMapApp:
         # Внутреннее состояние UI
         self._resize_job = None
         self._schools_menu = None
+        self._save_indicator_job = None
+        self._fade_job = None
+        self._fade_state = None
 
         self.setup_ui()
         self.root.after(100, self._initial_render)
@@ -61,7 +64,6 @@ class InteractiveMapApp:
         panel = tk.Frame(self.root, bg=config.COLOR_BG_PANEL)
         panel.pack(side=tk.TOP, fill=tk.X)
 
-        # Тонкая линия под панелью
         sep = tk.Frame(self.root, height=1, bg=config.COLOR_BORDER)
         sep.pack(side=tk.TOP, fill=tk.X)
 
@@ -85,6 +87,16 @@ class InteractiveMapApp:
             command=self.reset_all,
         ).pack(side=tk.RIGHT, padx=(0, 8), pady=8)
 
+        # Индикатор сохранения
+        self.save_indicator = tk.Label(
+            panel,
+            text="",
+            bg=config.COLOR_BG_PANEL,
+            fg=config.COLOR_SAVE_OK,
+            font=config.FONT_UI_BOLD,
+        )
+        self.save_indicator.pack(side=tk.RIGHT, padx=(0, 15), pady=8)
+
     def _build_schools_button(self):
         """Кнопка внизу справа, поверх канваса."""
         self.schools_btn = ttk.Button(
@@ -94,6 +106,102 @@ class InteractiveMapApp:
             command=self.toggle_schools_menu,
         )
         self.schools_btn.place(relx=1.0, rely=1.0, anchor="se", x=-20, y=-20)
+
+    # === ИНДИКАТОР СОХРАНЕНИЯ ===
+
+    def _set_save_indicator(self, text, color):
+        """
+        Поставить надпись БЕЗ автоскрытия — пока идёт операция.
+        Отменяет любую идущую анимацию затухания.
+        """
+        self._cancel_fade()
+        if self._save_indicator_job is not None:
+            self.root.after_cancel(self._save_indicator_job)
+            self._save_indicator_job = None
+        self.save_indicator.config(text=text, fg=color)
+
+    def _flash_save_indicator(self, text="Сохранено", ok=True):
+        """
+        Показать надпись и через SAVE_INDICATOR_DURATION мс
+        начать плавное затухание.
+        """
+        self._cancel_fade()
+        if self._save_indicator_job is not None:
+            self.root.after_cancel(self._save_indicator_job)
+
+        color = config.COLOR_SAVE_OK if ok else config.COLOR_SAVE_ERR
+        self.save_indicator.config(text=text, fg=color)
+
+        self._save_indicator_job = self.root.after(
+            config.SAVE_INDICATOR_DURATION,
+            self._start_fade,
+        )
+
+    def _start_fade(self):
+        """Запускает плавное затухание от текущего fg к цвету фона панели."""
+        self._save_indicator_job = None
+
+        start_color = self._hex_to_rgb(self.save_indicator.cget("fg"))
+        end_color = self._hex_to_rgb(config.COLOR_BG_PANEL)
+
+        total = config.SAVE_INDICATOR_FADE_MS
+        step = config.SAVE_INDICATOR_FADE_STEP_MS
+        steps = max(1, total // step)
+
+        self._fade_state = {
+            "start": start_color,
+            "end": end_color,
+            "steps": steps,
+            "i": 0,
+        }
+        self._fade_tick()
+
+    def _fade_tick(self):
+        state = self._fade_state
+        if state is None:
+            return
+
+        i = state["i"]
+        total = state["steps"]
+
+        if i > total:
+            # Затухание закончено — прячем текст
+            self.save_indicator.config(text="", fg=config.COLOR_SAVE_OK)
+            self._fade_state = None
+            self._fade_job = None
+            return
+
+        # Линейная интерполяция RGB
+        t = i / total
+        s = state["start"]
+        e = state["end"]
+        r = int(s[0] + (e[0] - s[0]) * t)
+        g = int(s[1] + (e[1] - s[1]) * t)
+        b = int(s[2] + (e[2] - s[2]) * t)
+        color_hex = f"#{r:02x}{g:02x}{b:02x}"
+
+        self.save_indicator.config(fg=color_hex)
+
+        state["i"] = i + 1
+        self._fade_job = self.root.after(
+            config.SAVE_INDICATOR_FADE_STEP_MS,
+            self._fade_tick,
+        )
+
+    def _cancel_fade(self):
+        """Останавливает идущую анимацию затухания, если она есть."""
+        if self._fade_job is not None:
+            try:
+                self.root.after_cancel(self._fade_job)
+            except Exception:
+                pass
+            self._fade_job = None
+        self._fade_state = None
+
+    @staticmethod
+    def _hex_to_rgb(hex_str):
+        hex_str = hex_str.lstrip("#")
+        return tuple(int(hex_str[i:i + 2], 16) for i in (0, 2, 4))
 
     # === МЕНЮ ШКОЛ ===
 
@@ -111,7 +219,6 @@ class InteractiveMapApp:
             highlightbackground=config.COLOR_BORDER,
         )
 
-        # Заголовок меню
         header = tk.Label(
             menu,
             text="Выбор школы",
@@ -124,7 +231,6 @@ class InteractiveMapApp:
         )
         header.pack(fill=tk.X)
 
-        # Разделитель под заголовком
         tk.Frame(menu, height=1, bg=config.COLOR_BORDER).pack(fill=tk.X)
 
         for school_name, rgb in self.schools:
@@ -154,8 +260,6 @@ class InteractiveMapApp:
             )
             lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-            # Замыкаем значения через аргументы по умолчанию,
-            # чтобы каждая итерация захватила свои row/inner/lbl.
             def on_enter(e, row_w=row, inner_w=inner, lbl_w=lbl):
                 for w in (row_w, inner_w, lbl_w):
                     w.configure(bg=config.COLOR_BG_MENU_HOVER)
@@ -172,18 +276,15 @@ class InteractiveMapApp:
                 w.bind("<Leave>", on_leave)
                 w.bind("<Button-1>", on_click)
 
-        # Считаем размеры меню
         menu.update_idletasks()
         menu_w = menu.winfo_reqwidth()
         menu_h = menu.winfo_reqheight()
 
-        # Координаты кнопки относительно root
         btn_x = self.schools_btn.winfo_x()
         btn_y = self.schools_btn.winfo_y()
         btn_w = self.schools_btn.winfo_width()
         btn_h = self.schools_btn.winfo_height()
 
-        # Меню над кнопкой, правые края выровнены
         x = btn_x + btn_w - menu_w
         y = btn_y - menu_h - 8
 
@@ -249,7 +350,11 @@ class InteractiveMapApp:
             return
 
         self.painter.paint_zone(zone_id, self.current_paint_color)
+
+        self._set_save_indicator("Сохраняю…", config.COLOR_SAVE_BUSY)
+        self.root.update_idletasks()
         self.painter.save_state()
+        self._flash_save_indicator("Зона захвачена")
 
         self.view.invalidate_cache()
         self.view.render(self.painter.display_img, force=True)
@@ -267,7 +372,11 @@ class InteractiveMapApp:
             return
 
         if self.painter.erase_zone(zone_id):
+            self._set_save_indicator("Сохраняю…", config.COLOR_SAVE_BUSY)
+            self.root.update_idletasks()
             self.painter.save_state()
+            self._flash_save_indicator("Зона освобождена")
+
             self.view.invalidate_cache()
             self.view.render(self.painter.display_img, force=True)
 
@@ -287,10 +396,15 @@ class InteractiveMapApp:
         if not filepath:
             return
 
+        self._set_save_indicator("Сохраняю…", config.COLOR_SAVE_BUSY)
+        self.root.update_idletasks()
+
         try:
             self.painter.display_img.save(filepath, "PNG")
+            self._flash_save_indicator("PNG сохранён")
             messagebox.showinfo("Готово", f"Карта сохранена:\n{filepath}")
         except Exception as e:
+            self._flash_save_indicator("Ошибка", ok=False)
             messagebox.showerror("Ошибка", f"Не удалось сохранить:\n{e}")
 
     # === СБРОС ===
@@ -301,6 +415,13 @@ class InteractiveMapApp:
             "Убрать все заливки? Это действие нельзя отменить.",
         ):
             return
+
         self.painter.reset()
+
+        self._set_save_indicator("Сохраняю…", config.COLOR_SAVE_BUSY)
+        self.root.update_idletasks()
+        self.painter.save_state()
+        self._flash_save_indicator("Сброшено")
+
         self.view.invalidate_cache()
         self.view.render(self.painter.display_img, force=True)
