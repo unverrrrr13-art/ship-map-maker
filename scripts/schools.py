@@ -25,11 +25,6 @@ def parse_hex(color_hex: str):
 
 
 def load_schools():
-    """
-    Возвращает список (name, (r, g, b)).
-    Если файла нет — создаёт его с дефолтным набором.
-    Некорректные строки пропускаются с предупреждением в консоль.
-    """
     path = schools_file()
     if not path.is_file():
         save_schools(DEFAULT_SCHOOLS)
@@ -56,9 +51,6 @@ def load_schools():
 
 
 def save_schools(schools):
-    """
-    schools: iterable of (name, hex) или (name, (r,g,b))
-    """
     path = schools_file()
     with open(path, "w", encoding="utf-8") as f:
         for name, value in schools:

@@ -16,8 +16,8 @@ class ZonePainter:
 
         self._inverse = None
         self._zone_index = None
-        self._zone_cache = {}        # zone_id -> (x0, y0, x1, y1, mask_crop)
-        self._orig_crop_cache = {}   # zone_id -> np.ndarray (H'×W'×4)
+        self._zone_cache = {}
+        self._orig_crop_cache = {}
 
         self.painted = {}
         self.load_state()
@@ -97,11 +97,9 @@ class ZonePainter:
         x0, y0, x1, y1, mask_crop = data
         orig_crop = self._get_orig_crop(zone_id, x0, y0, x1, y1)
 
-        # Берём текущее содержимое прямоугольника
         disp_crop = np.array(self.display_img.crop((x0, y0, x1, y1)), dtype=np.uint8)
 
-        # Возвращаем оригинал ТОЛЬКО там, где маска этой зоны
-        m = mask_crop[..., None]   # H'×W'×1 — broadcasting
+        m = mask_crop[..., None]
         disp_crop = np.where(m, orig_crop, disp_crop)
 
         self.display_img.paste(Image.fromarray(disp_crop, "RGBA"), (x0, y0))
@@ -113,14 +111,12 @@ class ZonePainter:
         orig_crop = self._get_orig_crop(zone_id, x0, y0, x1, y1)
         disp_crop = np.array(self.display_img.crop((x0, y0, x1, y1)), dtype=np.uint8)
 
-        # Смешивание через numpy
         alpha = color[3] / 255.0
         color_rgb = np.array(color[:3], dtype=np.float32)
         orig_rgb = orig_crop[..., :3].astype(np.float32)
 
         blended = (orig_rgb * (1.0 - alpha) + color_rgb * alpha).astype(np.uint8)
 
-        # Применяем ТОЛЬКО к пикселям маски
         m = mask_crop[..., None]
         disp_crop[..., :3] = np.where(m, blended, disp_crop[..., :3])
         disp_crop[..., 3] = np.where(mask_crop, 255, disp_crop[..., 3])

@@ -19,22 +19,17 @@ class InteractiveMapApp:
         self.root.minsize(config.WINDOW_MIN_WIDTH, config.WINDOW_MIN_HEIGHT)
         self.root.configure(bg=config.COLOR_BG_DARK)
 
-        # Применяем ttk-тему до создания виджетов
         apply_theme(self.root)
 
-        # Загрузка изображений и маски
         images = load_images()
         self.orig_img = images.orig
         self.mask_img = images.mask
 
-        # Логика заливки
         self.painter = ZonePainter(images.orig, images.mask_array)
         self.current_paint_color = config.DEFAULT_PAINT_COLOR
 
-        # Список школ из storage/schools.txt
         self.schools = load_schools()
 
-        # Внутреннее состояние UI
         self._resize_job = None
         self._schools_menu = None
         self._save_indicator_job = None
@@ -69,7 +64,7 @@ class InteractiveMapApp:
 
         ttk.Label(
             panel,
-            text="Кликните на каюту или квартал для захвата территории",
+            text="Кликните на сектор для захвата территории",
             style="App.TLabel",
         ).pack(side=tk.LEFT, padx=20, pady=10)
 
@@ -87,7 +82,6 @@ class InteractiveMapApp:
             command=self.reset_all,
         ).pack(side=tk.RIGHT, padx=(0, 8), pady=8)
 
-        # Индикатор сохранения
         self.save_indicator = tk.Label(
             panel,
             text="",
@@ -98,7 +92,6 @@ class InteractiveMapApp:
         self.save_indicator.pack(side=tk.RIGHT, padx=(0, 15), pady=8)
 
     def _build_schools_button(self):
-        """Кнопка внизу справа, поверх канваса."""
         self.schools_btn = ttk.Button(
             self.root,
             text="Выбрать школу",
@@ -107,13 +100,9 @@ class InteractiveMapApp:
         )
         self.schools_btn.place(relx=1.0, rely=1.0, anchor="se", x=-20, y=-20)
 
-    # === ИНДИКАТОР СОХРАНЕНИЯ ===
+    # === ИНДИКАТОР ===
 
     def _set_save_indicator(self, text, color):
-        """
-        Поставить надпись БЕЗ автоскрытия — пока идёт операция.
-        Отменяет любую идущую анимацию затухания.
-        """
         self._cancel_fade()
         if self._save_indicator_job is not None:
             self.root.after_cancel(self._save_indicator_job)
@@ -121,10 +110,6 @@ class InteractiveMapApp:
         self.save_indicator.config(text=text, fg=color)
 
     def _flash_save_indicator(self, text="Сохранено", ok=True):
-        """
-        Показать надпись и через SAVE_INDICATOR_DURATION мс
-        начать плавное затухание.
-        """
         self._cancel_fade()
         if self._save_indicator_job is not None:
             self.root.after_cancel(self._save_indicator_job)
@@ -138,7 +123,6 @@ class InteractiveMapApp:
         )
 
     def _start_fade(self):
-        """Запускает плавное затухание от текущего fg к цвету фона панели."""
         self._save_indicator_job = None
 
         start_color = self._hex_to_rgb(self.save_indicator.cget("fg"))
@@ -165,13 +149,11 @@ class InteractiveMapApp:
         total = state["steps"]
 
         if i > total:
-            # Затухание закончено — прячем текст
             self.save_indicator.config(text="", fg=config.COLOR_SAVE_OK)
             self._fade_state = None
             self._fade_job = None
             return
 
-        # Линейная интерполяция RGB
         t = i / total
         s = state["start"]
         e = state["end"]
@@ -189,7 +171,6 @@ class InteractiveMapApp:
         )
 
     def _cancel_fade(self):
-        """Останавливает идущую анимацию затухания, если она есть."""
         if self._fade_job is not None:
             try:
                 self.root.after_cancel(self._fade_job)

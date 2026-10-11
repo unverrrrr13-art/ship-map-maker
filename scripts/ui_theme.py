@@ -3,14 +3,8 @@ import config
 
 
 def apply_theme(root):
-    """
-    Настраивает ttk-стили под нашу палитру.
-    Вызывать один раз после создания root, до создания виджетов.
-    """
     style = ttk.Style(root)
 
-    # clam — самая нейтральная из встроенных тем,
-    # легко перекрашивается
     try:
         style.theme_use("clam")
     except Exception:

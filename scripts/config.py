@@ -10,7 +10,6 @@ WINDOW_MIN_WIDTH = 640
 WINDOW_MIN_HEIGHT = 480
 
 # === ЦВЕТОВАЯ СХЕМА ===
-# Тёмно-синяя гамма
 COLOR_BG_DARK         = "#1b2430"   # фон root-окна
 COLOR_BG_PANEL        = "#232f3e"   # фон панели управления
 COLOR_BG_CANVAS       = "#2b3648"   # фон канваса
@@ -32,9 +31,6 @@ COLOR_SAVE_BUSY = "#f59e0b"   # янтарный — процесс идёт
 SAVE_INDICATOR_DURATION = 1500   # мс, сколько держать надпись после завершения
 
 # === ШРИФТЫ ===
-# Segoe UI есть на Windows и обычно на Linux через шрифты от MS.
-# Если его нет — Tk возьмёт первый доступный из семейства.
-# Альтернатива для чистого Arch: "DejaVu Sans".
 FONT_UI        = ("Segoe UI", 10)
 FONT_UI_BOLD   = ("Segoe UI", 10, "bold")
 FONT_TITLE     = ("Segoe UI", 11, "bold")

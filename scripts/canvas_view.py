@@ -17,8 +17,7 @@ class CanvasView:
         self.offset_x = 0
         self.offset_y = 0
 
-        # Кэш последнего рендера
-        self._last_render_key = None      # (id(img), w, h)
+        self._last_render_key = None
         self._last_render_time = 0.0
         self._pending_render = None
 
